@@ -1,18 +1,5 @@
 """
-Bot Discord - Économie de Clan Warframe
-=========================================
-Commandes:
-  /lots               -> affiche les lots de ressources et leur prix en points
-  /don                -> déclare un don (en attente de validation par un admin/officier)
-  /valider_don        -> (admin) valide un don en attente et crédite les points
-  /refuser_don        -> (admin) refuse un don en attente
-  /boutique           -> affiche les récompenses disponibles (Warframes/armes/services)
-  /acheter            -> demande d'achat d'un item de la boutique (en attente de validation)
-  /valider_achat      -> (admin) valide un achat, débite les points, décrémente le stock
-  /refuser_achat      -> (admin) refuse un achat en attente
-  /solde              -> affiche le solde de points d'un membre
-  /classement         -> top contributeurs du clan
-  /ajouter_points     -> (admin) ajustement manuel de points (bonus, correction...)
+Bot Discord - Économie de Clan Warframe (v2 - avec images et pagination)
 """
 
 import json
@@ -23,12 +10,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
-
 TOKEN = os.environ.get("DISCORD_TOKEN")
-ADMIN_ROLE_NAME = os.environ.get("ADMIN_ROLE_NAME", "Officier")  # rôle Discord autorisé à valider
+ADMIN_ROLE_NAME = os.environ.get("ADMIN_ROLE_NAME", "Officier")
 
 RESSOURCES_FILE = "ressources.json"
 BOUTIQUE_FILE = "boutique.json"
@@ -40,10 +23,6 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-
-# ---------------------------------------------------------------------------
-# Utilitaires de persistance (fichiers JSON locaux)
-# ---------------------------------------------------------------------------
 
 def charger_json(fichier, defaut):
     if not os.path.exists(fichier):
@@ -70,93 +49,8 @@ def get_en_attente():
     return charger_json(EN_ATTENTE_FILE, {"dons": [], "achats": []})
 
 
-def get_ressources():worker: python bot.pydiscord.py>=2.3.2
-
-
-    return charger_json(RESSOURCES_FILE, {"tiers": []}){
-  "tiers": [{
-  "categories": [
-    {
-      "nom": "Warframes - Blueprints courants",
-      "items": [
-        { "nom": "Excalibur", "points": 150, "stock": -1 },
-        { "nom": "Mag", "points": 150, "stock": -1 },
-        { "nom": "Volt", "points": 150, "stock": -1 },
-        { "nom": "Loki", "points": 180, "stock": -1 }
-      ]
-    },
-    {
-      "nom": "Warframes - Prime / Rares",
-      "items": [
-        { "nom": "Exemple Warframe Prime", "points": 400, "stock": 1 }
-      ]
-    },
-    {
-      "nom": "Armes",
-      "items": [
-        { "nom": "Exemple Arme Rare", "points": 120, "stock": 2 }
-      ]
-    },
-    {
-      "nom": "Services",
-      "items": [
-        { "nom": "Carry Sortie complete (3 missions)", "points": 60, "stock": -1 },
-        { "nom": "Session farm Lich/Sister accompagnee", "points": 100, "stock": -1 }
-      ]
-    }
-  ],
-  "conversion_points_vers_plat": {
-    "points": 100,
-    "plat": 50
-  }
-}
-
-    {
-      "nom": "Tier 1 - Ressources communes",
-      "lots": [
-        { "ressource": "Ferrite", "quantite": 500, "points": 5 },
-        { "ressource": "Rubedo", "quantite": 500, "points": 5 },
-        { "ressource": "Salvage", "quantite": 500, "points": 5 },
-        { "ressource": "Polymer Bundle", "quantite": 500, "points": 5 },
-        { "ressource": "Circuits", "quantite": 500, "points": 5 },
-        { "ressource": "Alloy Plate", "quantite": 500, "points": 5 }
-      ]
-    },
-    {
-      "nom": "Tier 2 - Ressources moyennes",
-      "lots": [
-        { "ressource": "Plastids", "quantite": 100, "points": 10 },
-        { "ressource": "Gallium", "quantite": 100, "points": 10 },
-        { "ressource": "Cryotic", "quantite": 100, "points": 10 },
-        { "ressource": "Argon Crystal", "quantite": 100, "points": 10 },
-        { "ressource": "Tellurium", "quantite": 100, "points": 10 }
-      ]
-    },
-    {
-      "nom": "Tier 3 - Ressources rares",
-      "lots": [
-        { "ressource": "Neurodes", "quantite": 10, "points": 15 },
-        { "ressource": "Orokin Cell", "quantite": 10, "points": 15 },
-        { "ressource": "Control Module", "quantite": 10, "points": 15 },
-        { "ressource": "Morphics", "quantite": 10, "points": 15 }
-      ]
-    },
-    {
-      "nom": "Tier 4 - Ressources tres rares",
-      "lots": [
-        { "ressource": "Nitain Extract", "quantite": 5, "points": 20 }
-      ]
-    },
-    {
-      "nom": "Tier 5 - Farm long",
-      "lots": [
-        { "ressource": "Kuva", "quantite": 1000, "points": 10 },
-        { "ressource": "Endo", "quantite": 2000, "points": 10 }
-      ]
-    }
-  ]
-}
-
+def get_ressources():
+    return charger_json(RESSOURCES_FILE, {"tiers": []})
 
 
 def get_boutique():
@@ -202,9 +96,70 @@ def trouver_item_boutique(nom_item: str):
     return None, None
 
 
-# ---------------------------------------------------------------------------
-# Événements
-# ---------------------------------------------------------------------------
+def embed_pour_tier_ressource(tier: dict, index: int, total: int) -> discord.Embed:
+    embed = discord.Embed(
+        title=f"📦 {tier['nom']}",
+        description="Quantité requise par lot → points crédités",
+        color=discord.Color.blue(),
+    )
+    for lot in tier["lots"]:
+        embed.add_field(
+            name=lot["ressource"],
+            value=f"{lot['quantite']} unités → **{lot['points']} pts**",
+            inline=True,
+        )
+    if tier["lots"] and tier["lots"][0].get("image"):
+        embed.set_thumbnail(url=tier["lots"][0]["image"])
+    embed.set_footer(text=f"Tier {index + 1}/{total} • Utilise les boutons pour naviguer")
+    return embed
+
+
+def embed_pour_categorie_boutique(cat: dict, index: int, total: int) -> discord.Embed:
+    embed = discord.Embed(
+        title=f"🛒 {cat['nom']}",
+        description="Échange tes points contre ces récompenses",
+        color=discord.Color.gold(),
+    )
+    for item in cat["items"]:
+        stock_txt = "∞" if item["stock"] == -1 else str(item["stock"])
+        embed.add_field(
+            name=item["nom"],
+            value=f"**{item['points']} pts** (stock: {stock_txt})",
+            inline=True,
+        )
+    if cat["items"] and cat["items"][0].get("image"):
+        embed.set_thumbnail(url=cat["items"][0]["image"])
+    embed.set_footer(text=f"Catégorie {index + 1}/{total} • Utilise les boutons pour naviguer")
+    return embed
+
+
+class PaginationView(discord.ui.View):
+    def __init__(self, pages_data: list, builder_fn, timeout: int = 180):
+        super().__init__(timeout=timeout)
+        self.pages_data = pages_data
+        self.builder_fn = builder_fn
+        self.index = 0
+        self._update_buttons()
+
+    def _update_buttons(self):
+        self.precedent.disabled = self.index == 0
+        self.suivant.disabled = self.index >= len(self.pages_data) - 1
+
+    def embed_actuel(self) -> discord.Embed:
+        return self.builder_fn(self.pages_data[self.index], self.index, len(self.pages_data))
+
+    @discord.ui.button(label="◀ Précédent", style=discord.ButtonStyle.secondary)
+    async def precedent(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.index = max(0, self.index - 1)
+        self._update_buttons()
+        await interaction.response.edit_message(embed=self.embed_actuel(), view=self)
+
+    @discord.ui.button(label="Suivant ▶", style=discord.ButtonStyle.secondary)
+    async def suivant(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.index = min(len(self.pages_data) - 1, self.index + 1)
+        self._update_buttons()
+        await interaction.response.edit_message(embed=self.embed_actuel(), view=self)
+
 
 @bot.event
 async def on_ready():
@@ -212,30 +167,17 @@ async def on_ready():
     print(f"Connecté en tant que {bot.user} - {len(bot.guilds)} serveur(s)")
 
 
-# ---------------------------------------------------------------------------
-# /lots - afficher les lots de ressources et leur prix
-# ---------------------------------------------------------------------------
-
-@bot.tree.command(name="lots", description="Affiche les lots de ressources et leur prix en points")
+@bot.tree.command(name="lots", description="Affiche les lots de ressources et leur prix en points (avec images)")
 async def lots(interaction: discord.Interaction):
     data = get_ressources()
-    embed = discord.Embed(
-        title="📦 Barème des dons de ressources",
-        description="Quantité requise par lot → points crédités",
-        color=discord.Color.blue(),
-    )
-    for tier in data["tiers"]:
-        lignes = [
-            f"**{lot['ressource']}** : {lot['quantite']} unités → {lot['points']} pts"
-            for lot in tier["lots"]
-        ]
-        embed.add_field(name=tier["nom"], value="\n".join(lignes), inline=False)
-    await interaction.response.send_message(embed=embed)
+    tiers = data["tiers"]
+    if not tiers:
+        await interaction.response.send_message("Aucun barème configuré.", ephemeral=True)
+        return
 
+    view = PaginationView(tiers, embed_pour_tier_ressource)
+    await interaction.response.send_message(embed=view.embed_actuel(), view=view)
 
-# ---------------------------------------------------------------------------
-# /don - déclarer un don (passe en attente de validation)
-# ---------------------------------------------------------------------------
 
 @bot.tree.command(name="don", description="Déclare un don de ressources (en attente de validation)")
 @app_commands.describe(
@@ -281,15 +223,21 @@ async def don(interaction: discord.Interaction, ressource: str, quantite: int):
     })
     sauver_json(EN_ATTENTE_FILE, en_attente)
 
-    msg = (
-        f"📥 Don déclaré par {interaction.user.mention} : **{quantite}x {lot['ressource']}** "
-        f"({nb_lots} lot(s) → **{points_calcules} points**)"
+    embed = discord.Embed(
+        title="📥 Don déclaré",
+        description=f"{interaction.user.mention} a déclaré un don",
+        color=discord.Color.orange(),
     )
+    embed.add_field(name="Ressource", value=f"{quantite}x {lot['ressource']}", inline=True)
+    embed.add_field(name="Lots complets", value=str(nb_lots), inline=True)
+    embed.add_field(name="Points en attente", value=f"**{points_calcules} pts**", inline=True)
+    if lot.get("image"):
+        embed.set_thumbnail(url=lot["image"])
     if reste > 0:
-        msg += f"\n⚠️ Reste {reste} unités non comptées (pas assez pour un lot complet)."
-    msg += f"\n\n🔖 ID de la demande : `{don_id}` — en attente de validation par un officier (`/valider_don id:{don_id}`)."
+        embed.add_field(name="⚠️ Reste non compté", value=f"{reste} unités", inline=False)
+    embed.set_footer(text=f"ID demande: {don_id} • En attente de validation par un officier (/valider_don id:{don_id})")
 
-    await interaction.response.send_message(msg)
+    await interaction.response.send_message(embed=embed)
 
 
 @bot.tree.command(name="valider_don", description="[Officier] Valide un don en attente et crédite les points")
@@ -344,24 +292,16 @@ async def refuser_don(interaction: discord.Interaction, id: int, raison: str = "
     await interaction.response.send_message(msg)
 
 
-# ---------------------------------------------------------------------------
-# /boutique - afficher les récompenses disponibles
-# ---------------------------------------------------------------------------
-
-@bot.tree.command(name="boutique", description="Affiche les récompenses disponibles (Warframes, armes, services)")
+@bot.tree.command(name="boutique", description="Affiche les récompenses disponibles (avec images)")
 async def boutique(interaction: discord.Interaction):
     data = get_boutique()
-    embed = discord.Embed(
-        title="🛒 Boutique du clan",
-        description="Échange tes points contre des récompenses",
-        color=discord.Color.gold(),
-    )
-    for cat in data["categories"]:
-        lignes = []
-        for item in cat["items"]:
-            stock_txt = "∞" if item["stock"] == -1 else str(item["stock"])
-            lignes.append(f"**{item['nom']}** — {item['points']} pts (stock: {stock_txt})")
-        embed.add_field(name=cat["nom"], value="\n".join(lignes) or "Vide", inline=False)
+    categories = data["categories"]
+    if not categories:
+        await interaction.response.send_message("Aucune récompense configurée.", ephemeral=True)
+        return
+
+    view = PaginationView(categories, embed_pour_categorie_boutique)
+    embed = view.embed_actuel()
 
     conv = data.get("conversion_points_vers_plat")
     if conv:
@@ -370,7 +310,8 @@ async def boutique(interaction: discord.Interaction):
             value=f"{conv['points']} points → {conv['plat']} plat",
             inline=False,
         )
-    await interaction.response.send_message(embed=embed)
+
+    await interaction.response.send_message(embed=embed, view=view)
 
 
 @bot.tree.command(name="acheter", description="Demande l'achat d'un item de la boutique avec tes points")
@@ -411,10 +352,17 @@ async def acheter(interaction: discord.Interaction, item: str):
     })
     sauver_json(EN_ATTENTE_FILE, en_attente)
 
-    await interaction.response.send_message(
-        f"🛍️ Demande d'achat de **{article['nom']}** ({article['points']} pts) enregistrée.\n"
-        f"🔖 ID : `{achat_id}` — en attente de validation/livraison par un officier (`/valider_achat id:{achat_id}`)."
+    embed = discord.Embed(
+        title="🛍️ Demande d'achat",
+        description=f"{interaction.user.mention} souhaite acheter **{article['nom']}**",
+        color=discord.Color.purple(),
     )
+    embed.add_field(name="Coût", value=f"{article['points']} pts", inline=True)
+    if article.get("image"):
+        embed.set_thumbnail(url=article["image"])
+    embed.set_footer(text=f"ID demande: {achat_id} • En attente de validation (/valider_achat id:{achat_id})")
+
+    await interaction.response.send_message(embed=embed)
 
 
 @bot.tree.command(name="valider_achat", description="[Officier] Valide un achat, débite les points et le stock")
@@ -441,11 +389,9 @@ async def valider_achat(interaction: discord.Interaction, id: int):
         )
         return
 
-    # Débiter les points
     soldes[uid] = solde_actuel - demande["points"]
     sauver_json(SOLDES_FILE, soldes)
 
-    # Décrémenter le stock si limité
     boutique_data = get_boutique()
     for cat in boutique_data["categories"]:
         for article in cat["items"]:
@@ -486,10 +432,6 @@ async def refuser_achat(interaction: discord.Interaction, id: int, raison: str =
     await interaction.response.send_message(msg)
 
 
-# ---------------------------------------------------------------------------
-# /solde et /classement
-# ---------------------------------------------------------------------------
-
 @bot.tree.command(name="solde", description="Affiche ton solde de points (ou celui d'un autre membre)")
 @app_commands.describe(membre="Membre à consulter (optionnel, toi par défaut)")
 async def solde(interaction: discord.Interaction, membre: discord.Member = None):
@@ -517,10 +459,6 @@ async def classement(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
 
 
-# ---------------------------------------------------------------------------
-# Commande admin pour ajustement manuel
-# ---------------------------------------------------------------------------
-
 @bot.tree.command(name="ajouter_points", description="[Officier] Ajuste manuellement le solde de points d'un membre")
 @app_commands.describe(membre="Membre concerné", points="Nombre de points à ajouter (négatif pour retirer)", raison="Raison de l'ajustement")
 async def ajouter_points(interaction: discord.Interaction, membre: discord.Member, points: int, raison: str = "Ajustement manuel"):
@@ -539,10 +477,6 @@ async def ajouter_points(interaction: discord.Interaction, membre: discord.Membe
         f"✅ {points:+d} points pour {membre.display_name} ({raison}). Nouveau solde : {soldes[uid]} pts."
     )
 
-
-# ---------------------------------------------------------------------------
-# Lancement
-# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     if not TOKEN:
