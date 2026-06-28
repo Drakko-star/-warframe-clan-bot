@@ -1,0 +1,37 @@
+{
+  "categories": [
+    {
+      "nom": "Warframes - Blueprints courants",
+      "items": [
+        { "nom": "Excalibur", "points": 150, "stock": -1, "image": "https://wiki.warframe.com/images/ExcaliburIcon272.png" },
+        { "nom": "Mag", "points": 150, "stock": -1, "image": "https://wiki.warframe.com/images/MagIcon272.png" },
+        { "nom": "Volt", "points": 150, "stock": -1, "image": "https://wiki.warframe.com/images/VoltIcon272.png" },
+        { "nom": "Loki", "points": 180, "stock": -1, "image": "https://wiki.warframe.com/images/LokiIcon272.png" }
+      ]
+    },
+    {
+      "nom": "Warframes - Prime / Rares",
+      "items": [
+        { "nom": "Exemple Warframe Prime", "points": 400, "stock": 1, "image": "https://wiki.warframe.com/images/Excalibur_PrimeIcon272.png" }
+      ]
+    },
+    {
+      "nom": "Armes",
+      "items": [
+        { "nom": "Exemple Arme Rare", "points": 120, "stock": 2, "image": "https://wiki.warframe.com/images/Boltor.png" }
+      ]
+    },
+    {
+      "nom": "Services",
+      "items": [
+        { "nom": "Carry Sortie complete (3 missions)", "points": 60, "stock": -1, "image": "https://wiki.warframe.com/images/Sorties.png" },
+        { "nom": "Session farm Lich/Sister accompagnee", "points": 100, "stock": -1, "image": "https://wiki.warframe.com/images/KuvaLich.png" }
+      ]
+    }
+  ],
+  "conversion_points_vers_plat": {
+    "points": 100,
+    "plat": 50,
+    "image": "https://wiki.warframe.com/images/PlatinumLarge.png"
+  }
+}
