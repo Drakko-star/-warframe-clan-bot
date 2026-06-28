@@ -1,0 +1,550 @@
+"""
+Bot Discord - Économie de Clan Warframe
+=========================================
+Commandes:
+  /lots               -> affiche les lots de ressources et leur prix en points
+  /don                -> déclare un don (en attente de validation par un admin/officier)
+  /valider_don        -> (admin) valide un don en attente et crédite les points
+  /refuser_don        -> (admin) refuse un don en attente
+  /boutique           -> affiche les récompenses disponibles (Warframes/armes/services)
+  /acheter            -> demande d'achat d'un item de la boutique (en attente de validation)
+  /valider_achat      -> (admin) valide un achat, débite les points, décrémente le stock
+  /refuser_achat      -> (admin) refuse un achat en attente
+  /solde              -> affiche le solde de points d'un membre
+  /classement         -> top contributeurs du clan
+  /ajouter_points     -> (admin) ajustement manuel de points (bonus, correction...)
+"""
+
+import json
+import os
+from datetime import datetime
+
+import discord
+from discord import app_commands
+from discord.ext import commands
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+
+TOKEN = os.environ.get("DISCORD_TOKEN")
+ADMIN_ROLE_NAME = os.environ.get("ADMIN_ROLE_NAME", "Officier")  # rôle Discord autorisé à valider
+
+RESSOURCES_FILE = "ressources.json"
+BOUTIQUE_FILE = "boutique.json"
+SOLDES_FILE = "soldes.json"
+HISTORIQUE_FILE = "historique.json"
+EN_ATTENTE_FILE = "en_attente.json"
+
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix="!", intents=intents)
+
+
+# ---------------------------------------------------------------------------
+# Utilitaires de persistance (fichiers JSON locaux)
+# ---------------------------------------------------------------------------
+
+def charger_json(fichier, defaut):
+    if not os.path.exists(fichier):
+        sauver_json(fichier, defaut)
+        return defaut
+    with open(fichier, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def sauver_json(fichier, data):
+    with open(fichier, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+def get_soldes():
+    return charger_json(SOLDES_FILE, {})
+
+
+def get_historique():
+    return charger_json(HISTORIQUE_FILE, [])
+
+
+def get_en_attente():
+    return charger_json(EN_ATTENTE_FILE, {"dons": [], "achats": []})
+
+
+def get_ressources():worker: python bot.pydiscord.py>=2.3.2
+
+
+    return charger_json(RESSOURCES_FILE, {"tiers": []}){
+  "tiers": [{
+  "categories": [
+    {
+      "nom": "Warframes - Blueprints courants",
+      "items": [
+        { "nom": "Excalibur", "points": 150, "stock": -1 },
+        { "nom": "Mag", "points": 150, "stock": -1 },
+        { "nom": "Volt", "points": 150, "stock": -1 },
+        { "nom": "Loki", "points": 180, "stock": -1 }
+      ]
+    },
+    {
+      "nom": "Warframes - Prime / Rares",
+      "items": [
+        { "nom": "Exemple Warframe Prime", "points": 400, "stock": 1 }
+      ]
+    },
+    {
+      "nom": "Armes",
+      "items": [
+        { "nom": "Exemple Arme Rare", "points": 120, "stock": 2 }
+      ]
+    },
+    {
+      "nom": "Services",
+      "items": [
+        { "nom": "Carry Sortie complete (3 missions)", "points": 60, "stock": -1 },
+        { "nom": "Session farm Lich/Sister accompagnee", "points": 100, "stock": -1 }
+      ]
+    }
+  ],
+  "conversion_points_vers_plat": {
+    "points": 100,
+    "plat": 50
+  }
+}
+
+    {
+      "nom": "Tier 1 - Ressources communes",
+      "lots": [
+        { "ressource": "Ferrite", "quantite": 500, "points": 5 },
+        { "ressource": "Rubedo", "quantite": 500, "points": 5 },
+        { "ressource": "Salvage", "quantite": 500, "points": 5 },
+        { "ressource": "Polymer Bundle", "quantite": 500, "points": 5 },
+        { "ressource": "Circuits", "quantite": 500, "points": 5 },
+        { "ressource": "Alloy Plate", "quantite": 500, "points": 5 }
+      ]
+    },
+    {
+      "nom": "Tier 2 - Ressources moyennes",
+      "lots": [
+        { "ressource": "Plastids", "quantite": 100, "points": 10 },
+        { "ressource": "Gallium", "quantite": 100, "points": 10 },
+        { "ressource": "Cryotic", "quantite": 100, "points": 10 },
+        { "ressource": "Argon Crystal", "quantite": 100, "points": 10 },
+        { "ressource": "Tellurium", "quantite": 100, "points": 10 }
+      ]
+    },
+    {
+      "nom": "Tier 3 - Ressources rares",
+      "lots": [
+        { "ressource": "Neurodes", "quantite": 10, "points": 15 },
+        { "ressource": "Orokin Cell", "quantite": 10, "points": 15 },
+        { "ressource": "Control Module", "quantite": 10, "points": 15 },
+        { "ressource": "Morphics", "quantite": 10, "points": 15 }
+      ]
+    },
+    {
+      "nom": "Tier 4 - Ressources tres rares",
+      "lots": [
+        { "ressource": "Nitain Extract", "quantite": 5, "points": 20 }
+      ]
+    },
+    {
+      "nom": "Tier 5 - Farm long",
+      "lots": [
+        { "ressource": "Kuva", "quantite": 1000, "points": 10 },
+        { "ressource": "Endo", "quantite": 2000, "points": 10 }
+      ]
+    }
+  ]
+}
+
+
+
+def get_boutique():
+    return charger_json(BOUTIQUE_FILE, {"categories": [], "conversion_points_vers_plat": {}})
+
+
+def ajouter_historique(type_action, user_id, user_name, detail, points):
+    hist = get_historique()
+    hist.append({
+        "date": datetime.utcnow().isoformat(),
+        "type": type_action,
+        "user_id": user_id,
+        "user_name": user_name,
+        "detail": detail,
+        "points": points,
+    })
+    sauver_json(HISTORIQUE_FILE, hist)
+
+
+def est_admin(interaction: discord.Interaction) -> bool:
+    if interaction.user.guild_permissions.administrator:
+        return True
+    return any(role.name == ADMIN_ROLE_NAME for role in interaction.user.roles)
+
+
+def trouver_lot(nom_ressource: str):
+    data = get_ressources()
+    nom_ressource = nom_ressource.strip().lower()
+    for tier in data["tiers"]:
+        for lot in tier["lots"]:
+            if lot["ressource"].lower() == nom_ressource:
+                return lot
+    return None
+
+
+def trouver_item_boutique(nom_item: str):
+    data = get_boutique()
+    nom_item = nom_item.strip().lower()
+    for cat in data["categories"]:
+        for item in cat["items"]:
+            if item["nom"].lower() == nom_item:
+                return cat, item
+    return None, None
+
+
+# ---------------------------------------------------------------------------
+# Événements
+# ---------------------------------------------------------------------------
+
+@bot.event
+async def on_ready():
+    await bot.tree.sync()
+    print(f"Connecté en tant que {bot.user} - {len(bot.guilds)} serveur(s)")
+
+
+# ---------------------------------------------------------------------------
+# /lots - afficher les lots de ressources et leur prix
+# ---------------------------------------------------------------------------
+
+@bot.tree.command(name="lots", description="Affiche les lots de ressources et leur prix en points")
+async def lots(interaction: discord.Interaction):
+    data = get_ressources()
+    embed = discord.Embed(
+        title="📦 Barème des dons de ressources",
+        description="Quantité requise par lot → points crédités",
+        color=discord.Color.blue(),
+    )
+    for tier in data["tiers"]:
+        lignes = [
+            f"**{lot['ressource']}** : {lot['quantite']} unités → {lot['points']} pts"
+            for lot in tier["lots"]
+        ]
+        embed.add_field(name=tier["nom"], value="\n".join(lignes), inline=False)
+    await interaction.response.send_message(embed=embed)
+
+
+# ---------------------------------------------------------------------------
+# /don - déclarer un don (passe en attente de validation)
+# ---------------------------------------------------------------------------
+
+@bot.tree.command(name="don", description="Déclare un don de ressources (en attente de validation)")
+@app_commands.describe(
+    ressource="Nom de la ressource (ex: Neurodes)",
+    quantite="Quantité totale donnée",
+)
+async def don(interaction: discord.Interaction, ressource: str, quantite: int):
+    lot = trouver_lot(ressource)
+    if lot is None:
+        await interaction.response.send_message(
+            f"❌ Ressource `{ressource}` introuvable dans le barème. Utilise `/lots` pour voir la liste.",
+            ephemeral=True,
+        )
+        return
+
+    if quantite <= 0:
+        await interaction.response.send_message("❌ La quantité doit être positive.", ephemeral=True)
+        return
+
+    nb_lots = quantite // lot["quantite"]
+    if nb_lots <= 0:
+        await interaction.response.send_message(
+            f"❌ Il faut au moins {lot['quantite']} unités de {lot['ressource']} pour 1 lot. "
+            f"Tu en as déclaré {quantite}.",
+            ephemeral=True,
+        )
+        return
+
+    points_calcules = nb_lots * lot["points"]
+    reste = quantite - (nb_lots * lot["quantite"])
+
+    en_attente = get_en_attente()
+    don_id = len(en_attente["dons"]) + 1
+    en_attente["dons"].append({
+        "id": don_id,
+        "user_id": interaction.user.id,
+        "user_name": str(interaction.user),
+        "ressource": lot["ressource"],
+        "quantite": quantite,
+        "nb_lots": nb_lots,
+        "points": points_calcules,
+        "statut": "en_attente",
+    })
+    sauver_json(EN_ATTENTE_FILE, en_attente)
+
+    msg = (
+        f"📥 Don déclaré par {interaction.user.mention} : **{quantite}x {lot['ressource']}** "
+        f"({nb_lots} lot(s) → **{points_calcules} points**)"
+    )
+    if reste > 0:
+        msg += f"\n⚠️ Reste {reste} unités non comptées (pas assez pour un lot complet)."
+    msg += f"\n\n🔖 ID de la demande : `{don_id}` — en attente de validation par un officier (`/valider_don id:{don_id}`)."
+
+    await interaction.response.send_message(msg)
+
+
+@bot.tree.command(name="valider_don", description="[Officier] Valide un don en attente et crédite les points")
+@app_commands.describe(id="ID de la demande de don")
+async def valider_don(interaction: discord.Interaction, id: int):
+    if not est_admin(interaction):
+        await interaction.response.send_message("❌ Réservé aux officiers du clan.", ephemeral=True)
+        return
+
+    en_attente = get_en_attente()
+    demande = next((d for d in en_attente["dons"] if d["id"] == id and d["statut"] == "en_attente"), None)
+    if demande is None:
+        await interaction.response.send_message(f"❌ Aucune demande de don en attente avec l'ID `{id}`.", ephemeral=True)
+        return
+
+    soldes = get_soldes()
+    uid = str(demande["user_id"])
+    soldes[uid] = soldes.get(uid, 0) + demande["points"]
+    sauver_json(SOLDES_FILE, soldes)
+
+    demande["statut"] = "valide"
+    sauver_json(EN_ATTENTE_FILE, en_attente)
+
+    ajouter_historique("don", demande["user_id"], demande["user_name"],
+                        f"{demande['quantite']}x {demande['ressource']}", demande["points"])
+
+    await interaction.response.send_message(
+        f"✅ Don `{id}` validé : **{demande['points']} points** crédités à {demande['user_name']} "
+        f"(nouveau solde : {soldes[uid]} pts)."
+    )
+
+
+@bot.tree.command(name="refuser_don", description="[Officier] Refuse un don en attente")
+@app_commands.describe(id="ID de la demande de don", raison="Raison du refus (optionnel)")
+async def refuser_don(interaction: discord.Interaction, id: int, raison: str = ""):
+    if not est_admin(interaction):
+        await interaction.response.send_message("❌ Réservé aux officiers du clan.", ephemeral=True)
+        return
+
+    en_attente = get_en_attente()
+    demande = next((d for d in en_attente["dons"] if d["id"] == id and d["statut"] == "en_attente"), None)
+    if demande is None:
+        await interaction.response.send_message(f"❌ Aucune demande de don en attente avec l'ID `{id}`.", ephemeral=True)
+        return
+
+    demande["statut"] = "refuse"
+    sauver_json(EN_ATTENTE_FILE, en_attente)
+
+    msg = f"🚫 Don `{id}` refusé ({demande['user_name']} — {demande['quantite']}x {demande['ressource']})."
+    if raison:
+        msg += f"\nRaison : {raison}"
+    await interaction.response.send_message(msg)
+
+
+# ---------------------------------------------------------------------------
+# /boutique - afficher les récompenses disponibles
+# ---------------------------------------------------------------------------
+
+@bot.tree.command(name="boutique", description="Affiche les récompenses disponibles (Warframes, armes, services)")
+async def boutique(interaction: discord.Interaction):
+    data = get_boutique()
+    embed = discord.Embed(
+        title="🛒 Boutique du clan",
+        description="Échange tes points contre des récompenses",
+        color=discord.Color.gold(),
+    )
+    for cat in data["categories"]:
+        lignes = []
+        for item in cat["items"]:
+            stock_txt = "∞" if item["stock"] == -1 else str(item["stock"])
+            lignes.append(f"**{item['nom']}** — {item['points']} pts (stock: {stock_txt})")
+        embed.add_field(name=cat["nom"], value="\n".join(lignes) or "Vide", inline=False)
+
+    conv = data.get("conversion_points_vers_plat")
+    if conv:
+        embed.add_field(
+            name="💱 Conversion plat",
+            value=f"{conv['points']} points → {conv['plat']} plat",
+            inline=False,
+        )
+    await interaction.response.send_message(embed=embed)
+
+
+@bot.tree.command(name="acheter", description="Demande l'achat d'un item de la boutique avec tes points")
+@app_commands.describe(item="Nom exact de l'item (voir /boutique)")
+async def acheter(interaction: discord.Interaction, item: str):
+    cat, article = trouver_item_boutique(item)
+    if article is None:
+        await interaction.response.send_message(
+            f"❌ Item `{item}` introuvable. Utilise `/boutique` pour voir la liste exacte.",
+            ephemeral=True,
+        )
+        return
+
+    if article["stock"] == 0:
+        await interaction.response.send_message(f"❌ `{article['nom']}` est en rupture de stock.", ephemeral=True)
+        return
+
+    soldes = get_soldes()
+    uid = str(interaction.user.id)
+    solde_actuel = soldes.get(uid, 0)
+
+    if solde_actuel < article["points"]:
+        await interaction.response.send_message(
+            f"❌ Solde insuffisant. Il te faut {article['points']} pts, tu en as {solde_actuel}.",
+            ephemeral=True,
+        )
+        return
+
+    en_attente = get_en_attente()
+    achat_id = len(en_attente["achats"]) + 1
+    en_attente["achats"].append({
+        "id": achat_id,
+        "user_id": interaction.user.id,
+        "user_name": str(interaction.user),
+        "item": article["nom"],
+        "points": article["points"],
+        "statut": "en_attente",
+    })
+    sauver_json(EN_ATTENTE_FILE, en_attente)
+
+    await interaction.response.send_message(
+        f"🛍️ Demande d'achat de **{article['nom']}** ({article['points']} pts) enregistrée.\n"
+        f"🔖 ID : `{achat_id}` — en attente de validation/livraison par un officier (`/valider_achat id:{achat_id}`)."
+    )
+
+
+@bot.tree.command(name="valider_achat", description="[Officier] Valide un achat, débite les points et le stock")
+@app_commands.describe(id="ID de la demande d'achat")
+async def valider_achat(interaction: discord.Interaction, id: int):
+    if not est_admin(interaction):
+        await interaction.response.send_message("❌ Réservé aux officiers du clan.", ephemeral=True)
+        return
+
+    en_attente = get_en_attente()
+    demande = next((a for a in en_attente["achats"] if a["id"] == id and a["statut"] == "en_attente"), None)
+    if demande is None:
+        await interaction.response.send_message(f"❌ Aucune demande d'achat en attente avec l'ID `{id}`.", ephemeral=True)
+        return
+
+    soldes = get_soldes()
+    uid = str(demande["user_id"])
+    solde_actuel = soldes.get(uid, 0)
+
+    if solde_actuel < demande["points"]:
+        await interaction.response.send_message(
+            f"❌ {demande['user_name']} n'a plus assez de points (solde actuel : {solde_actuel}).",
+            ephemeral=True,
+        )
+        return
+
+    # Débiter les points
+    soldes[uid] = solde_actuel - demande["points"]
+    sauver_json(SOLDES_FILE, soldes)
+
+    # Décrémenter le stock si limité
+    boutique_data = get_boutique()
+    for cat in boutique_data["categories"]:
+        for article in cat["items"]:
+            if article["nom"] == demande["item"] and article["stock"] != -1:
+                article["stock"] = max(0, article["stock"] - 1)
+    sauver_json(BOUTIQUE_FILE, boutique_data)
+
+    demande["statut"] = "valide"
+    sauver_json(EN_ATTENTE_FILE, en_attente)
+
+    ajouter_historique("achat", demande["user_id"], demande["user_name"], demande["item"], -demande["points"])
+
+    await interaction.response.send_message(
+        f"✅ Achat `{id}` validé : **{demande['item']}** débité ({demande['points']} pts) pour {demande['user_name']}.\n"
+        f"📦 N'oublie pas de livrer l'item en jeu (trade manuel) !"
+    )
+
+
+@bot.tree.command(name="refuser_achat", description="[Officier] Refuse une demande d'achat")
+@app_commands.describe(id="ID de la demande d'achat", raison="Raison du refus (optionnel)")
+async def refuser_achat(interaction: discord.Interaction, id: int, raison: str = ""):
+    if not est_admin(interaction):
+        await interaction.response.send_message("❌ Réservé aux officiers du clan.", ephemeral=True)
+        return
+
+    en_attente = get_en_attente()
+    demande = next((a for a in en_attente["achats"] if a["id"] == id and a["statut"] == "en_attente"), None)
+    if demande is None:
+        await interaction.response.send_message(f"❌ Aucune demande d'achat en attente avec l'ID `{id}`.", ephemeral=True)
+        return
+
+    demande["statut"] = "refuse"
+    sauver_json(EN_ATTENTE_FILE, en_attente)
+
+    msg = f"🚫 Achat `{id}` refusé ({demande['user_name']} — {demande['item']})."
+    if raison:
+        msg += f"\nRaison : {raison}"
+    await interaction.response.send_message(msg)
+
+
+# ---------------------------------------------------------------------------
+# /solde et /classement
+# ---------------------------------------------------------------------------
+
+@bot.tree.command(name="solde", description="Affiche ton solde de points (ou celui d'un autre membre)")
+@app_commands.describe(membre="Membre à consulter (optionnel, toi par défaut)")
+async def solde(interaction: discord.Interaction, membre: discord.Member = None):
+    cible = membre or interaction.user
+    soldes = get_soldes()
+    pts = soldes.get(str(cible.id), 0)
+    await interaction.response.send_message(f"💰 **{cible.display_name}** : {pts} points")
+
+
+@bot.tree.command(name="classement", description="Top contributeurs du clan")
+async def classement(interaction: discord.Interaction):
+    soldes = get_soldes()
+    if not soldes:
+        await interaction.response.send_message("Aucune donnée pour le moment.")
+        return
+
+    classement_trie = sorted(soldes.items(), key=lambda x: x[1], reverse=True)[:10]
+    embed = discord.Embed(title="🏆 Classement du clan", color=discord.Color.purple())
+    lignes = []
+    for i, (uid, pts) in enumerate(classement_trie, start=1):
+        membre = interaction.guild.get_member(int(uid))
+        nom = membre.display_name if membre else f"Inconnu ({uid})"
+        lignes.append(f"{i}. **{nom}** — {pts} pts")
+    embed.description = "\n".join(lignes)
+    await interaction.response.send_message(embed=embed)
+
+
+# ---------------------------------------------------------------------------
+# Commande admin pour ajustement manuel
+# ---------------------------------------------------------------------------
+
+@bot.tree.command(name="ajouter_points", description="[Officier] Ajuste manuellement le solde de points d'un membre")
+@app_commands.describe(membre="Membre concerné", points="Nombre de points à ajouter (négatif pour retirer)", raison="Raison de l'ajustement")
+async def ajouter_points(interaction: discord.Interaction, membre: discord.Member, points: int, raison: str = "Ajustement manuel"):
+    if not est_admin(interaction):
+        await interaction.response.send_message("❌ Réservé aux officiers du clan.", ephemeral=True)
+        return
+
+    soldes = get_soldes()
+    uid = str(membre.id)
+    soldes[uid] = soldes.get(uid, 0) + points
+    sauver_json(SOLDES_FILE, soldes)
+
+    ajouter_historique("ajustement", membre.id, str(membre), raison, points)
+
+    await interaction.response.send_message(
+        f"✅ {points:+d} points pour {membre.display_name} ({raison}). Nouveau solde : {soldes[uid]} pts."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Lancement
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    if not TOKEN:
+        raise RuntimeError("La variable d'environnement DISCORD_TOKEN n'est pas définie.")
+    bot.run(TOKEN)
