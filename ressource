@@ -1,0 +1,47 @@
+{
+  "tiers": [
+    {
+      "nom": "Tier 1 - Ressources communes",
+      "lots": [
+        { "ressource": "Ferrite", "quantite": 500, "points": 5, "image": "https://wiki.warframe.com/images/Ferrite.png" },
+        { "ressource": "Rubedo", "quantite": 500, "points": 5, "image": "https://wiki.warframe.com/images/Rubedo.png" },
+        { "ressource": "Salvage", "quantite": 500, "points": 5, "image": "https://wiki.warframe.com/images/Salvage.png" },
+        { "ressource": "Polymer Bundle", "quantite": 500, "points": 5, "image": "https://wiki.warframe.com/images/PolymerBundle.png" },
+        { "ressource": "Circuits", "quantite": 500, "points": 5, "image": "https://wiki.warframe.com/images/Circuits.png" },
+        { "ressource": "Alloy Plate", "quantite": 500, "points": 5, "image": "https://wiki.warframe.com/images/AlloyPlate.png" }
+      ]
+    },
+    {
+      "nom": "Tier 2 - Ressources moyennes",
+      "lots": [
+        { "ressource": "Plastids", "quantite": 100, "points": 10, "image": "https://wiki.warframe.com/images/Plastids.png" },
+        { "ressource": "Gallium", "quantite": 100, "points": 10, "image": "https://wiki.warframe.com/images/Gallium.png" },
+        { "ressource": "Cryotic", "quantite": 100, "points": 10, "image": "https://wiki.warframe.com/images/Cryotic.png" },
+        { "ressource": "Argon Crystal", "quantite": 100, "points": 10, "image": "https://wiki.warframe.com/images/ArgonCrystal.png" },
+        { "ressource": "Tellurium", "quantite": 100, "points": 10, "image": "https://wiki.warframe.com/images/Tellurium.png" }
+      ]
+    },
+    {
+      "nom": "Tier 3 - Ressources rares",
+      "lots": [
+        { "ressource": "Neurodes", "quantite": 10, "points": 15, "image": "https://wiki.warframe.com/images/Neurodes.png" },
+        { "ressource": "Orokin Cell", "quantite": 10, "points": 15, "image": "https://wiki.warframe.com/images/OrokinCell.png" },
+        { "ressource": "Control Module", "quantite": 10, "points": 15, "image": "https://wiki.warframe.com/images/ControlModule.png" },
+        { "ressource": "Morphics", "quantite": 10, "points": 15, "image": "https://wiki.warframe.com/images/Morphics.png" }
+      ]
+    },
+    {
+      "nom": "Tier 4 - Ressources tres rares",
+      "lots": [
+        { "ressource": "Nitain Extract", "quantite": 5, "points": 20, "image": "https://wiki.warframe.com/images/NitainExtract.png" }
+      ]
+    },
+    {
+      "nom": "Tier 5 - Farm long",
+      "lots": [
+        { "ressource": "Kuva", "quantite": 1000, "points": 10, "image": "https://wiki.warframe.com/images/Kuva.png" },
+        { "ressource": "Endo", "quantite": 2000, "points": 10, "image": "https://wiki.warframe.com/images/Endo.png" }
+      ]
+    }
+  ]
+}
